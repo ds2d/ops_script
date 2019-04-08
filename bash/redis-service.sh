@@ -1,11 +1,10 @@
-/etc/init.d/redis
-
 #!/bin/sh
 #Configurations injected by install_server below....
 
 EXEC=/usr/local/bin/redis-server
 CLIEXEC=/usr/local/bin/redis-cli
 PIDFILE=/var/run/redis_6379.pid
+PID=`ps -ef|grep -v grep|grep redis-server|awk '{print $2}'`
 CONF="/etc/redis/6379.conf"
 REDISPORT="6379"
 PASSWORD="**********"
@@ -28,11 +27,13 @@ PASSWORD="**********"
 
 case "$1" in
     start)
-        if [ -f $PIDFILE ]
+        #if [ -f $PIDFILE ]
+        if [ ! -z $PID ]
         then
             echo "$PIDFILE exists, process is already running or crashed"
         else
             echo "Starting Redis server..."
+            rm -f $PIDFILE
             $EXEC $CONF
         fi
         ;;
@@ -41,7 +42,7 @@ case "$1" in
         then
             echo "$PIDFILE does not exist, process is not running"
         else
-            PID=$(cat $PIDFILE)
+            #PID=$(cat $PIDFILE)
             echo "Stopping ..."
             $CLIEXEC -a $PASSWORD -p $REDISPORT shutdown
             while [ -x /proc/${PID} ]
@@ -53,7 +54,7 @@ case "$1" in
         fi
         ;;
     status)
-        PID=$(cat $PIDFILE)
+        #PID=$(cat $PIDFILE)
         if [ -z $PID  ]
         then
             echo 'Redis is not running'
