@@ -1,13 +1,7 @@
 #!/bin/sh
+
 #Configurations injected by install_server below....
 
-EXEC=/usr/local/bin/redis-server
-CLIEXEC=/usr/local/bin/redis-cli
-PIDFILE=/var/run/redis_6379.pid
-PID=`ps -ef|grep -v grep|grep redis-server|awk '{print $2}'`
-CONF="/etc/redis/6379.conf"
-REDISPORT="6379"
-PASSWORD="**********"
 ###############
 # SysV Init Information
 # chkconfig: - 58 74
@@ -24,6 +18,14 @@ PASSWORD="**********"
 # Description: Redis daemon
 ### END INIT INFO
 
+EXEC=/wdzj/java/lib/redis/bin/redis-server
+CLIEXEC=/wdzj/java/lib/redis/bin/redis-cli
+PIDFILE=/wdzj/java/lib/redis/redis.pid
+PID=`ps -ef|grep -v grep|grep redis-server|awk '{print $2}'`
+CONF="/wdzj/java/lib/redis/redis.conf"
+REDISPORT="6379"
+PASSWORD="wdzj2014"
+
 
 case "$1" in
     start)
@@ -38,13 +40,14 @@ case "$1" in
         fi
         ;;
     stop)
-        if [ ! -f $PIDFILE ]
+        if [ -z $PID ]
         then
             echo "$PIDFILE does not exist, process is not running"
         else
             #PID=$(cat $PIDFILE)
             echo "Stopping ..."
             $CLIEXEC -a $PASSWORD -p $REDISPORT shutdown
+            rm -f $PIDFILE
             while [ -x /proc/${PID} ]
             do
                 echo "Waiting for Redis to shutdown ..."
@@ -55,11 +58,11 @@ case "$1" in
         ;;
     status)
         #PID=$(cat $PIDFILE)
-        if [ -z $PID  ]
+        if [ -z ${PID} ]
         then
             echo 'Redis is not running'
         else
-            echo -e "Redis is running \033[0;32m $PID \033[0m"
+            echo "Redis is running ($PID)"
         fi
         ;;
     restart)
