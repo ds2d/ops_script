@@ -9,7 +9,7 @@ ips=$(awk '{print $1}' /root/host)
 for ip in $ips
 do
 #echo $ip
-host=`grep $ip eng-host|awk '{print $2}'`
+host=`grep $ip /root/host|awk '{print $2}'`
 #echo $host
 ssh -p2022 root@$ip "sed -i 's/^HOSTNAME.*/HOSTNAME=$host/' /etc/sysconfig/network"
 
