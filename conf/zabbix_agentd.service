@@ -1,0 +1,15 @@
+[Unit]
+Description=zabbix_agentd
+Documentation=https://www.zabbix.com/documentation/3.4/manual
+After=syslog.target network.target
+
+[Service]
+Type=forking
+PIDFile=/tmp/zabbix_agentd.pid
+ExecStart=/usr/sbin/zabbix_agentd -c /etc/zabbix/zabbix_agentd.conf
+ExecReload=/usr/bin/kill -s HUP $MAINPID
+ExecStop=/usr/bin/kill -s QUIT $MAINPID
+#PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.targe
