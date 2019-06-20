@@ -72,8 +72,7 @@ deploy() {
 }
 
 
-for project in ${DEPLOY_LIST[@]}
-do
+for project in ${DEPLOY_LIST[@]}; do
     echo "deploying $project" >> $LOG_FILE
     deploy ${project}
     sleep 5
