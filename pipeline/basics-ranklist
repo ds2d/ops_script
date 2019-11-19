@@ -1,0 +1,44 @@
+node {
+def
+now='$(date +%F)'
+project='basics-ranklist'
+host='192.168.30.200'
+ssh_port='22'
+workspace=pwd()
+   
+   stage('pullCode') { // for display purposes
+      // Get some code from a GitHub repository
+      git branch: 'master', url: 'git@gitlab.rongzhijia.com:rzj-tech/basics-ranklist.git'
+     
+   }
+   stage('mvnBuild') {
+      // Run the maven build
+       env.JAVA_HOME = '/wdzj/java/jdk1.8.0_74'
+       sh "/wdzj/java/lib/maven/bin/mvn clean install"
+   }
+   stage('deployEnv') {
+      sh """
+    cd  $JENKINS_HOME/workspace/env/env
+    /wdzj/java/lib/git/bin/git pull
+    scp -r -P '$ssh_port'  $JENKINS_HOME/workspace/env/env root@'$host':/root/install/
+    echo "Deploying env finished"
+      """
+   }
+   stage('deployPackage') {
+       sh """
+        cd $WORKSPACE
+        scp -P '$ssh_port' basics-ranklist-service/target/basics-ranklist-service-bin.zip root@'$host':/root/install/'$project.$now'.zip
+        echo "Deployed '$project'  finished"
+       """
+   }
+   stage('dockerBuildImages') {
+      sh """
+      ssh -p $ssh_port root@$host " cd /root/install/;sh dockerImages.sh '$project.$now'.zip"
+      """
+   }
+    stage('StartProject') {
+      sh """
+      ssh -p $ssh_port root@$host " docker run -d -v /root/install/env:/root/config/env:ro  192.168.30.110/library/$project:$now"
+      """
+   }
+}
