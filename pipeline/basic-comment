@@ -1,0 +1,42 @@
+node {
+def
+now='$(date +%F)'
+project='basic-comment'
+host='dev_basic-comment01'
+ssh_port='22'
+workspace=pwd()
+   
+   stage('pull code') { // for display purposes
+      // Get some code from a GitHub repository
+      git 'git@gitlab.rongzhijia.com:jdq_rpc_server/basic-comment.git'
+     
+   }
+   stage('mvn build') {
+      // Run the maven build
+       env.JAVA_HOME = '/wdzj/java/jdk1.8.0_74'
+       sh "/wdzj/java/lib/maven/bin/mvn clean deploy"
+   }
+   stage('deploy env') {
+      sh """
+    cd  $JENKINS_HOME/workspace/env/env
+    /wdzj/java/lib/git/bin/git pull
+    scp -r -P '$ssh_port'  $JENKINS_HOME/workspace/env/env root@'$host':/root/install/
+    echo "Deploying env finished"
+      """
+   }
+   stage('deploy project') {
+       sh """
+        cd $WORKSPACE
+        pwd
+        ls  basics-comment-service/target |grep -E  '*.zip'
+        echo basics-comment-service/target/basics-comment-service-bin.zip
+        scp -P '$ssh_port' basics-comment-service/target/basics-comment-service-bin.zip root@'$host':/root/install/'$project.$now'.zip
+        echo "tranclate '${project}.${now}'.zip  file over!"
+        ssh -p $ssh_port root@$host " cd /root/install/;sh install-'$project'.sh '$project.$now'.zip"
+        echo "Deployed '$project'  finished"
+       """
+   }
+   stage('test') {
+      sh 'ps -ef|grep \'$project\'|awk \'{print $2}\''
+   }
+}
