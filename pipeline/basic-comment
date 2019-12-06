@@ -1,42 +1,75 @@
-node {
 def
-now='$(date +%F)'
-project='basic-comment'
-host='dev_basic-comment01'
+now='$(date "+%Y.%m.%d")'
+project='back-hybrid'
+host='192.168.30.200'
 ssh_port='22'
-workspace=pwd()
-   
-   stage('pull code') { // for display purposes
+version='$BUILD_NUMBER'
+
+node {
+   stage('pullCode') { // for display purposes
       // Get some code from a GitHub repository
-      git 'git@gitlab.rongzhijia.com:jdq_rpc_server/basic-comment.git'
-     
+      git branch: 'master', url: "git@gitlab.rongzhijia.com:jdq_rpc_server/${project}.git"
    }
-   stage('mvn build') {
+   stage('mvnBuild') {
       // Run the maven build
        env.JAVA_HOME = '/wdzj/java/jdk1.8.0_74'
-       sh "/wdzj/java/lib/maven/bin/mvn clean deploy"
+       sh "/wdzj/java/lib/maven/bin/mvn -U clean install"
    }
-   stage('deploy env') {
+   stage('deployEnv') {
+       // Scp env file to remote
       sh """
     cd  $JENKINS_HOME/workspace/env/env
     /wdzj/java/lib/git/bin/git pull
-    scp -r -P '$ssh_port'  $JENKINS_HOME/workspace/env/env root@'$host':/root/install/
-    echo "Deploying env finished"
+    scp -r -P $ssh_port  $JENKINS_HOME/workspace/env/env root@192.168.30.204:/wdzj/nfs
       """
    }
-   stage('deploy project') {
-       sh """
-        cd $WORKSPACE
-        pwd
-        ls  basics-comment-service/target |grep -E  '*.zip'
-        echo basics-comment-service/target/basics-comment-service-bin.zip
-        scp -P '$ssh_port' basics-comment-service/target/basics-comment-service-bin.zip root@'$host':/root/install/'$project.$now'.zip
-        echo "tranclate '${project}.${now}'.zip  file over!"
-        ssh -p $ssh_port root@$host " cd /root/install/;sh install-'$project'.sh '$project.$now'.zip"
-        echo "Deployed '$project'  finished"
-       """
+   stage('buildImages') {
+       //docker build image && push repository
+      sh """
+    cd $WORKSPACE
+    cp back-hybrid-web/target/back-hybrid-web.war /root/install
+    ls -l /root/install/
+
+    echo "Create Dockerfile......"
+    cd /root/install/
+    cat >/root/install/Dockerfile.$project << EOF
+    FROM reg.harbor.com/library/tomcat:8.5
+
+    ADD back-hybrid-web.war /data/
+    WORKDIR /data
+    RUN unzip -d /usr/local/tomcat/webapps/ROOT back-hybrid-web.war
+
+    EXPOSE 8080
+
+    CMD ["/usr/local/tomcat/bin/catalina.sh","run"]
+EOF
+
+    echo "Build Image......"
+    docker build -f /root/install/Dockerfile.$project -t reg.harbor.com/library/$project:$version .
+
+    echo "Push image harbor storage......"
+    docker push reg.harbor.com/library/$project:$version
+      """
    }
-   stage('test') {
-      sh 'ps -ef|grep \'$project\'|awk \'{print $2}\''
+    stage('deployService') {
+        //run docker images
+       //ssh -p $ssh_port root@$host " docker service create --replicas 2 --name $project --network dev-net --mount type=bind,src=/root/install/env,dst=/root/env,readonly reg.harbor.com/library/$project:$version"
+      //ssh -p $ssh_port root@$host " docker service update --image reg.harbor.com/library/$project:$version $project "
+      sh """
+      ssh -p $ssh_port root@$host " if docker service ls|grep $project; then 
+      echo "$project  running......"  
+      echo "update image $project:$version"  
+      docker service update --image reg.harbor.com/library/$project:$version $project     
+  else         
+      echo "$project not running......"  
+      echo "Create swarm service......"  
+      docker service create   \
+      --replicas 2  \
+      --name $project  \
+      --network dev-net  \
+      --mount \'type=volume,src=env_data,dst=/wdzj/java,volume-driver=local,volume-opt=type=nfs,volume-opt=device=:/wdzj/nfs,\\"volume-opt=o=addr=192.168.30.204,vers=4,soft,timeo=180,bg,tcp,ro\\"\'  \
+      reg.harbor.com/library/$project:$version     
+  fi"
+    """
    }
 }
